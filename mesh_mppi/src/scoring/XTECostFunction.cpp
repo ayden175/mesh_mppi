@@ -22,6 +22,7 @@ XTECostFunction::XTECostFunction(
     name_ = name;
     namespace_ = name + ".cost";
     weights_.setZero();
+    heading_weight_ = 0.0f;
     
     // Setup parameters
     callback_handle_ = node_->add_on_set_parameters_callback(std::bind(&XTECostFunction::reconfigure_callback, this, _1));
@@ -61,6 +62,18 @@ XTECostFunction::XTECostFunction(
         desc.name = namespace_ + ".lookahead_distance";
         desc.description = "The length of the segment of the path in front of the robot used for Cross-Track-Error calculation. Cannot be less than 2.0 meters.";
         node_->declare_parameter<double>(desc.name, 4.0, desc);
+    }
+    {
+        rcl_interfaces::msg::ParameterDescriptor desc;
+        desc.name = namespace_ + ".heading_weight";
+        desc.description = "Weight of the heading-alignment cost. Penalizes the angular "
+                        "deviation between the robot heading and the path tangent. "
+                        "Provides the gradient that turns the robot toward the path.";
+        rcl_interfaces::msg::FloatingPointRange range;
+        range.from_value = 0.0;
+        range.to_value = 10.0;
+        desc.set__floating_point_range({range});
+        node_->declare_parameter(desc.name, 2.0, desc);
     }
 
     // Read the mbf dist_tolerance
@@ -118,6 +131,10 @@ rcl_interfaces::msg::SetParametersResult XTECostFunction::reconfigure_callback(
         else if ("dist_tolerance" == param.get_name())
         {
             goal_tolerance_ = param.get_value<double>();
+        }
+        else if (namespace_ + ".heading_weight" == param.get_name())
+        {
+            heading_weight_ = param.get_value<double>();
         }
     }
 
@@ -326,7 +343,40 @@ std::expected<float, Error> XTECostFunction::score(
     }
     costs(2) /= traj.size();
 
-    return (costs * weights_).sum();
+    // Heading alignment cost
+    // Penalizes the angular deviation between the robot's forward direction
+    // and the tangent of the closest segment of the local plan (ref_).
+    // ref_ is built in prepare_for_scoring() from the closest path point
+    // ahead of the robot, so its tangent always points toward the goal.
+    // This is the term that creates a turning gradient when the goal is
+    // behind or beside the robot (where XTE + goal terms alone are flat).
+    float heading_cost = 0.0f;
+    if (heading_weight_ > 0.0f && !ref_.empty())
+    {
+        for (const auto& state: traj)
+        {
+        const auto seg_it = ref_.closest_segment_to(state.pose.position);
+        if (seg_it == ref_.end())
+        {
+            continue;
+        }
+        // Path tangent (b - a points toward the goal along the path)
+        Eigen::Vector3f tangent = to_eigen_vec(seg_it->b() - seg_it->a());
+        if (tangent.squaredNorm() < 1e-9f)
+        {
+            continue; // degenerate segment
+        }
+        tangent.normalize();
+        // Robot forward direction (x-axis is forward, ROS REP-103)
+        const Eigen::Vector3f forward = state.pose.orientation * Eigen::Vector3f::UnitX();
+        // Angle in [0, pi]; atan2 form is numerically stable near 0 and pi
+        heading_cost += std::atan2(tangent.cross(forward).norm(), tangent.dot(forward));
+        }
+        heading_cost /= static_cast<float>(traj.size());
+        heading_cost *= static_cast<float>(M_1_PI); // normalize to [0, 1]
+    }
+
+    return (costs * weights_).sum() + heading_weight_ * heading_cost;
 }
 
 } // namespace mesh_mppi

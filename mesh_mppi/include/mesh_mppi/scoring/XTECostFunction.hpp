@@ -73,6 +73,8 @@ private:
     Pose goal_;
     // Weights of the different cost terms
     Costs weights_;
+    // Weight of the heading-alignment cost
+    float heading_weight_;
     // The current configured goal_translation_tolerance
     float goal_tolerance_;
     // The cost limit above which a state is considered lethal

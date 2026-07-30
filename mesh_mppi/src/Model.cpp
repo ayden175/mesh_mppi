@@ -14,7 +14,7 @@ namespace mesh_mppi
 
 // The precision to use when checking distances.
 // We do not need sub millimeter precision here.
-constexpr float MM_PRECISION = 0.001;
+constexpr float MM_PRECISION = 0.08;
 
 MeshSurfaceModel::MeshSurfaceModel(
     const mesh_map::MeshMap::Ptr& map

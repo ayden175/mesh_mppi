@@ -52,13 +52,14 @@ uint32_t MeshMPPI<KinematicsT>::computeVelocityCommands(
 
         // FIXME: Do we really have to check this or do we trust the MeshMap?
         // Maybe this can be removed when the MeshMap uses a BVH for closest point?
-        if (0.001 < point_to_plane_distance(
+        float dist_to_plane = point_to_plane_distance(
             current.pose.position,
             map_->mesh()->getVertexPositionsOfFace(current.face.unwrap())[0],
             map_->faceNormals()[current.face.unwrap()]
-        ))
+        );
+        if (0.08 < dist_to_plane)
         {
-            message = "Projected robot position is not on the mesh surface!";
+            message = "Projected robot position is not on the mesh surface! Calculated distance to plane: " + std::to_string(dist_to_plane);
             return ExePathResult::OUT_OF_MAP;
         }
 
