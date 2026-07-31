@@ -73,7 +73,7 @@ XTECostFunction::XTECostFunction(
         range.from_value = 0.0;
         range.to_value = 10.0;
         desc.set__floating_point_range({range});
-        node_->declare_parameter(desc.name, 2.0, desc);
+        node_->declare_parameter(desc.name, 0.0, desc);
     }
 
     // Read the mbf dist_tolerance
