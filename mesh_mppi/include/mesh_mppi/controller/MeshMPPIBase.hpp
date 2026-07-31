@@ -140,6 +140,8 @@ protected:
     // The current state of the controller
     StateMachine state_;
 
+    double projection_tolerance_{0.001};
+
 private:
 
     [[nodiscard]] bool initializeParameters();

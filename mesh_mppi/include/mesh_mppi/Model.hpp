@@ -75,6 +75,15 @@ public:
         float distance
     );
 
+    /**
+     * @brief Sets the projection tolerance for mesh surface checks
+     * @param tolerance The maximum allowed distance (meters) between a pose and the mesh surface
+     */
+    void setProjectionTolerance(double tolerance)
+    {
+        projection_tolerance_ = tolerance;
+    }
+
 private:
 
     inline Vector rotate_direction_onto_new_triangle(const Vector& dir, const Normal& old_normal, const Normal& new_normal) const
@@ -91,6 +100,9 @@ private:
     // Map of the environment
     std::shared_ptr<lvr2::PMPMesh<mesh_map::Vector>> mesh_;
     lvr2::DenseFaceMap<Normal> normals_;
+
+    // The maximum allowed distance (meters) between a pose and the mesh surface
+    float projection_tolerance_{0.001};
 };
 
 

@@ -30,7 +30,8 @@ public:
         const std::shared_ptr<KinematicT>& kinematic,
         const mesh_map::MeshMap::Ptr& map,
         const int32_t samples,
-        const int32_t horizon
+        const int32_t horizon,
+        const float projection_tolerance
     );
 
     /**

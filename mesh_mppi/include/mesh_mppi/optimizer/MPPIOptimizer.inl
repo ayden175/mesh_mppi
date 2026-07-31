@@ -17,7 +17,8 @@ bool MPPIOptimizer<KinematicT>::initialize(
     const std::shared_ptr<KinematicT>& kinematic,
     const mesh_map::MeshMap::Ptr& map,
     const int32_t samples,
-    const int32_t horizon
+    const int32_t horizon,
+    const float projection_tolerance
 )
 {
     this->node_ = node;
@@ -39,6 +40,8 @@ bool MPPIOptimizer<KinematicT>::initialize(
         RCLCPP_ERROR(get_logger(), "MeshMPPI: make_unique<Model> returned nullptr");
         return false;
     }
+    model_->setProjectionTolerance(projection_tolerance);
+
     rclcpp::QoS qos = rclcpp::SensorDataQoS();
     qos.reliable();
     qos.keep_last(1);

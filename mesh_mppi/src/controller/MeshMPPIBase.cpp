@@ -170,6 +170,17 @@ bool MeshMPPIBase::initializeParameters()
     }
     progress_num_timesteps_ = static_cast<size_t>(time * params_.controller_frequency);
     }
+    { // Projection tolerance for mesh surface checks
+        rcl_interfaces::msg::ParameterDescriptor desc;
+        desc.name = name_ + ".projection_tolerance";
+        desc.description = "The maximum allowed distance (meters) between a pose and the mesh surface. "
+                            "Increase this for uneven terrain with coarse meshes or noisy localization.";
+        rcl_interfaces::msg::FloatingPointRange range;
+        range.from_value = 0.001;
+        range.to_value = 0.5;
+        desc.floating_point_range.push_back(range);
+        projection_tolerance_ = node_->declare_parameter(desc.name, 0.001, desc);
+    }
 
     reconfigure_callback_handle_ = node_->add_on_set_parameters_callback(
         std::bind(&MeshMPPIBase::reconfigure, this, std::placeholders::_1)
@@ -213,6 +224,10 @@ rcl_interfaces::msg::SetParametersResult MeshMPPIBase::reconfigure(const std::ve
                 result.successful = false;
             }
             progress_num_timesteps_ = static_cast<size_t>(params_.controller_frequency * param.as_double());
+        }
+        else if (name_ + ".projection_tolerance" == param.get_name())
+        {
+            projection_tolerance_ = param.as_double();
         }
     }
 

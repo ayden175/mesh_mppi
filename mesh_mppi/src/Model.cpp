@@ -14,7 +14,7 @@ namespace mesh_mppi
 
 // The precision to use when checking distances.
 // We do not need sub millimeter precision here.
-constexpr float MM_PRECISION = 0.08;
+constexpr float MM_PRECISION = 0.001;
 
 MeshSurfaceModel::MeshSurfaceModel(
     const mesh_map::MeshMap::Ptr& map
@@ -51,7 +51,7 @@ std::expected<SurfacePose, Error> MeshSurfaceModel::predict(const SurfacePose& c
         current.pose.position,
         mesh_->getVertexPositionsOfFace(current.face)[0],
         normals_[current.face]
-    )) > MM_PRECISION)
+    )) > projection_tolerance_)
     {
         return std::unexpected(Error::INVALID_INPUT);
     }
@@ -85,7 +85,7 @@ std::expected<SurfacePose, Error> MeshSurfaceModel::predict(const SurfacePose& c
             pose.pose.position,
             mesh_->getVertexPositionsOfFace(pose.face)[0],
             normals_[pose.face]
-        ) > MM_PRECISION)
+        ) > projection_tolerance_)
         {
             return std::unexpected(Error::PREDICTION_ERROR);
         }

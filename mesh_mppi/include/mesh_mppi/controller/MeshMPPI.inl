@@ -57,7 +57,7 @@ uint32_t MeshMPPI<KinematicsT>::computeVelocityCommands(
             map_->mesh()->getVertexPositionsOfFace(current.face.unwrap())[0],
             map_->faceNormals()[current.face.unwrap()]
         );
-        if (0.08 < dist_to_plane)
+        if (this->projection_tolerance_ < dist_to_plane)
         {
             message = "Projected robot position is not on the mesh surface! Calculated distance to plane: " + std::to_string(dist_to_plane);
             return ExePathResult::OUT_OF_MAP;
@@ -182,7 +182,7 @@ bool MeshMPPI<KinematicsT>::initialize()
         }
     }
 
-    this->optimizer_.initialize(node_, name_, cost_function_, kinematics_, map_, params_.samples, params_.horizon);
+    this->optimizer_.initialize(node_, name_, cost_function_, kinematics_, map_, params_.samples, params_.horizon, projection_tolerance_);
 
     return true;
 }
