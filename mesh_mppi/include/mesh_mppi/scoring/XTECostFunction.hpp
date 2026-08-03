@@ -75,6 +75,10 @@ private:
     Costs weights_;
     // Weight of the heading-alignment cost
     float heading_weight_;
+    // The weight of the goal orientation cost
+    float goal_angle_weight_;
+    // Distance to start caring about final orientation
+    float goal_angle_threshold_;
     // The current configured goal_translation_tolerance
     float goal_tolerance_;
     // The cost limit above which a state is considered lethal

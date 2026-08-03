@@ -75,6 +75,22 @@ XTECostFunction::XTECostFunction(
         desc.set__floating_point_range({range});
         node_->declare_parameter(desc.name, 0.0, desc);
     }
+    {
+        rcl_interfaces::msg::ParameterDescriptor desc;
+        desc.name = namespace_ + ".goal_angle_weight";
+        desc.description = "Weight of the goal orientation alignment cost.";
+        rcl_interfaces::msg::FloatingPointRange range;
+        range.from_value = 0.0;
+        range.to_value = 10.0;
+        desc.set__floating_point_range({range});
+        node_->declare_parameter(desc.name, 0.0, desc);
+    }
+    {
+        rcl_interfaces::msg::ParameterDescriptor desc;
+        desc.name = namespace_ + ".goal_angle_threshold";
+        desc.description = "Distance (m) to the goal within which to start enforcing goal orientation.";
+        node_->declare_parameter(desc.name, 1.5, desc);
+    }
 
     // Read the mbf dist_tolerance
     if (!node->has_parameter("dist_tolerance")) {
@@ -135,6 +151,14 @@ rcl_interfaces::msg::SetParametersResult XTECostFunction::reconfigure_callback(
         else if (namespace_ + ".heading_weight" == param.get_name())
         {
             heading_weight_ = param.get_value<double>();
+        }
+        else if (namespace_ + ".goal_angle_weight" == param.get_name())
+        {
+            goal_angle_weight_ = param.get_value<double>();
+        }
+        else if (namespace_ + ".goal_angle_threshold" == param.get_name())
+        {
+            goal_angle_threshold_ = param.get_value<double>();
         }
     }
 
@@ -355,28 +379,43 @@ std::expected<float, Error> XTECostFunction::score(
     {
         for (const auto& state: traj)
         {
-        const auto seg_it = ref_.closest_segment_to(state.pose.position);
-        if (seg_it == ref_.end())
-        {
-            continue;
-        }
-        // Path tangent (b - a points toward the goal along the path)
-        Eigen::Vector3f tangent = to_eigen_vec(seg_it->b() - seg_it->a());
-        if (tangent.squaredNorm() < 1e-9f)
-        {
-            continue; // degenerate segment
-        }
-        tangent.normalize();
-        // Robot forward direction (x-axis is forward, ROS REP-103)
-        const Eigen::Vector3f forward = state.pose.orientation * Eigen::Vector3f::UnitX();
-        // Angle in [0, pi]; atan2 form is numerically stable near 0 and pi
-        heading_cost += std::atan2(tangent.cross(forward).norm(), tangent.dot(forward));
+            const auto seg_it = ref_.closest_segment_to(state.pose.position);
+            if (seg_it == ref_.end())
+            {
+                continue;
+            }
+            Eigen::Vector3f tangent = to_eigen_vec(seg_it->b() - seg_it->a());
+            if (tangent.squaredNorm() < 1e-9f)
+            {
+                continue;
+            }
+            tangent.normalize();
+            const Eigen::Vector3f forward = state.pose.orientation * Eigen::Vector3f::UnitX();
+            heading_cost += std::atan2(tangent.cross(forward).norm(), tangent.dot(forward));
         }
         heading_cost /= static_cast<float>(traj.size());
         heading_cost *= static_cast<float>(M_1_PI); // normalize to [0, 1]
+        heading_cost = heading_cost * heading_cost * heading_cost;
     }
 
-    return (costs * weights_).sum() + heading_weight_ * heading_cost;
+    // Goal orientation cost
+    // Ramps up linearly as the robot approaches the goal, ensuring the optimizer
+    // starts correcting the final orientation long before hitting the translation tolerance.
+    float goal_angle_cost = 0.0f;
+    if (goal_angle_weight_ > 0.0f)
+    {
+        const float dist_to_goal = traj.back().pose.position.distance(goal_.position);
+        if (dist_to_goal < goal_angle_threshold_)
+        {
+        goal_angle_cost = goal_.orientation.angularDistance(traj.back().pose.orientation) * static_cast<float>(M_1_PI);
+        // Angle cost scales up as the robot approaches the goal, making it more important over time
+        goal_angle_cost *= (goal_angle_threshold_ - dist_to_goal) / goal_angle_threshold_;
+        }
+    }
+
+    return (costs * weights_).sum()
+        + heading_weight_ * heading_cost
+        + goal_angle_weight_ * goal_angle_cost;
 }
 
 } // namespace mesh_mppi
